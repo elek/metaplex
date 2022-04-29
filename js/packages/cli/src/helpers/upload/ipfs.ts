@@ -1,5 +1,4 @@
 import log from 'loglevel';
-import fetch from 'node-fetch';
 import { create, globSource } from 'ipfs-http-client';
 import path from 'path';
 import { setImageUrlManifest } from './file-uri';
@@ -20,9 +19,15 @@ export async function ipfsUpload(
   manifestBuffer: Buffer,
 ) {
   const tokenIfps = `${ipfsCredentials.projectId}:${ipfsCredentials.secretKey}`;
-  // @ts-ignore
-  const ipfs = create('https://ipfs.infura.io:5001');
   const authIFPS = Buffer.from(tokenIfps).toString('base64');
+
+  // @ts-ignore
+  const ipfs = create({
+    protocol: 'https',
+    port: 443,
+    host: 'www.storj-ipfs.com',
+    headers: { Authorization: 'Basic ' + authIFPS },
+  });
 
   const uploadToIpfs = async source => {
     const { cid } = await ipfs.add(source).catch();
@@ -34,14 +39,8 @@ export async function ipfsUpload(
       globSource(media, { recursive: true }),
     );
     log.debug('mediaHash:', mediaHash);
-    const mediaUrl = `https://ipfs.io/ipfs/${mediaHash}`;
+    const mediaUrl = `https://www.storj-ipfs.com/ipfs/${mediaHash}`;
     log.info('mediaUrl:', mediaUrl);
-    await fetch(`https://ipfs.infura.io:5001/api/v0/pin/add?arg=${mediaHash}`, {
-      headers: {
-        Authorization: `Basic ${authIFPS}`,
-      },
-      method: 'POST',
-    });
     log.info('uploaded media for file:', media);
     return mediaUrl;
   }
@@ -64,18 +63,8 @@ export async function ipfsUpload(
   const manifestHash = await uploadToIpfs(
     Buffer.from(JSON.stringify(manifestJson)),
   );
-  await fetch(
-    `https://ipfs.infura.io:5001/api/v0/pin/add?arg=${manifestHash}`,
-    {
-      headers: {
-        Authorization: `Basic ${authIFPS}`,
-      },
-      method: 'POST',
-    },
-  );
-
   await sleep(500);
-  const link = `https://ipfs.io/ipfs/${manifestHash}`;
+  const link = `https://www.storj-ipfs.com/ipfs/${manifestHash}`;
   log.info('uploaded manifest: ', link);
 
   return [link, imageUrl, animationUrl];
